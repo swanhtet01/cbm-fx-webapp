@@ -2,7 +2,14 @@
 import streamlit as st
 import math
 import pandas as pd
-import matplotlib.pyplot as plt
+
+# Matplotlib is optional; fall back to Streamlit charts if missing
+try:
+    import matplotlib.pyplot as plt
+    HAS_MPL = True
+except ModuleNotFoundError:
+    plt = None
+    HAS_MPL = False
 
 st.set_page_config(page_title="Export FX — CBM vs Black", page_icon="🌍", layout="wide")
 
@@ -10,6 +17,14 @@ st.set_page_config(page_title="Export FX — CBM vs Black", page_icon="🌍", la
 def blended_rate(p1_pct, r1, r2):
     p1 = p1_pct / 100.0
     return p1 * r1 + (1 - p1) * r2
+
+
+def required_rate(target_rate, p1_pct, r1):
+    """Rate on the non-official share to hit a target overall rate."""
+    p1 = p1_pct / 100.0
+    if (1 - p1) == 0:
+        return float("inf")
+    return (target_rate - p1 * r1) / (1 - p1)
 
 def mmk_with_split(usd, p1_pct, r1, r2, flat_fee=0.0, pct_fee=0.0):
     rate = blended_rate(p1_pct, r1, r2)
@@ -65,10 +80,16 @@ shortfall = mmk_black - mmk_split
 pct_of_black = (rate_eff / r2) if r2 else float("nan")
 pct_shortfall = 1 - pct_of_black if r2 else float("nan")
 
+# Rate required on the remaining share to match full black payout
+r2_required = required_rate(r2, p1_pct, r1)
+cbm_usd = usd * (p1_pct / 100.0)
+exporter_usd = usd - cbm_usd
+target_total_mmk = usd * r2
+cbm_mmk = cbm_usd * r1
+exporter_mmk_needed = exporter_usd * r2_required
+
 # Threshold analytics
-# r2_needed = (r2 - p1*r1) / (1 - p1)  [derived earlier, but here we want r_eff target or p1_max for target]
 p1_frac = p1_pct/100.0 if p1_pct is not None else 0.0
-r2_needed_to_be_whole = (r2 - p1_frac * r1) / (1 - p1_frac) if (1 - p1_frac) > 0 else float("inf")
 p1_max_for_target = (r2 - (target_pct_black/100.0)*r2) / (r2 - r1) if (r2 - r1) != 0 else float("nan")
 
 # ====== TOP CARDS ======
@@ -85,21 +106,50 @@ k7.metric("Per $100k Shortfall", fmt_mmk(100000*(r2 - rate_eff)))
 
 st.markdown("---")
 
+# ====== REQUIRED RATE SUMMARY ======
+st.subheader("Exporter Payout — CBM 25% Rule")
+st.markdown(
+    f"Target: {usd:,.0f} USD × {r2:,.0f} = {target_total_mmk:,.0f} MMK")
+st.markdown(
+    f"CBM Portion: {cbm_usd:,.0f} USD × {r1:,.0f} = {cbm_mmk:,.0f} MMK")
+st.markdown(
+    f"Exporter Portion: {exporter_usd:,.0f} USD → {exporter_mmk_needed:,.0f} MMK")
+st.markdown(
+    f"Required Rate on {exporter_usd:,.0f} USD: {r2_required:,.2f} MMK/USD")
+st.caption(
+    f"One-liner: Pay {r2_required:,.2f} on the {100 - p1_pct}% so exporter still gets {r2:,.0f} overall.")
+
+st.markdown("---")
+
 # ====== SIMPLE CHART ======
 left, right = st.columns([1, 1])
 with left:
     st.subheader("MMK Comparison (Net)")
-    fig, ax = plt.subplots()
-    ax.bar(["With Split (net)", "Full Black (net)"], [mmk_split, mmk_black])
-    ax.set_ylabel("MMK")
-    st.pyplot(fig)
+    if HAS_MPL:
+        fig, ax = plt.subplots()
+        ax.bar(["With Split (net)", "Full Black (net)"], [mmk_split, mmk_black])
+        ax.set_ylabel("MMK")
+        st.pyplot(fig)
+    else:
+        chart_df = pd.DataFrame({
+            "With Split (net)": [mmk_split],
+            "Full Black (net)": [mmk_black],
+        })
+        st.bar_chart(chart_df)
 
 with right:
     st.subheader("Per-$1 View")
-    fig2, ax2 = plt.subplots()
-    ax2.bar(["Actual (blended)", "Full Black"], [rate_eff, r2])
-    ax2.set_ylabel("MMK per USD")
-    st.pyplot(fig2)
+    if HAS_MPL:
+        fig2, ax2 = plt.subplots()
+        ax2.bar(["Actual (blended)", "Full Black"], [rate_eff, r2])
+        ax2.set_ylabel("MMK per USD")
+        st.pyplot(fig2)
+    else:
+        chart_df2 = pd.DataFrame({
+            "Actual (blended)": [rate_eff],
+            "Full Black": [r2],
+        })
+        st.bar_chart(chart_df2)
 
 st.markdown("---")
 
@@ -127,8 +177,8 @@ c1, c2 = st.columns(2)
 with c1:
     st.markdown(f"- **Max official p₁ to keep ≥ {target_pct_black}% of black**: "
                 f"≈ **{p1_max_for_target:.2%}**" if not math.isnan(p1_max_for_target) else "- Not defined (r₂=r₁).")
-    st.markdown(f"- **r₂ required to be fully whole at current p₁**: **{r2_needed_to_be_whole:,.2f} MMK/USD**" 
-                if r2_needed_to_be_whole != float('inf') else "- r₂ required: ∞ (p₁=100%).")
+    st.markdown(f"- **r₂ required to be fully whole at current p₁**: **{r2_required:,.2f} MMK/USD**"
+                if r2_required != float('inf') else "- r₂ required: ∞ (p₁=100%).")
 with c2:
     st.markdown("- **Negotiation framing**: Offer at the **blended rate** or quote '% of black achieved'.")
     st.markdown("- **Pricing guardrails**: Use the max p₁ figure when discussing policy changes or contracts.")
