@@ -9,6 +9,7 @@ A super-simple web app to compare Myanmar CBM split vs full black market rate fo
 - Charts: MMK totals and per-$1 view
 - Sensitivity: quick grid of shortfall across p1% and r2 ±400
 - Scenarios: add multiple scenarios and export to CSV
+- Required-rate summary to show the black rate needed on the exporter's share
 
 ## Local Run
 ```bash
@@ -26,3 +27,4 @@ streamlit run app.py
 - No external APIs used; rates are entered by you.
 - Fees apply equally to split and full-black paths in this simple model.
 - You can customize branding and add authentication later if needed.
+- Charts fall back to Streamlit's built-ins if `matplotlib` isn't installed.
