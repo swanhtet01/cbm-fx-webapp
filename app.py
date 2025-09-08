@@ -168,7 +168,6 @@ with left:
         st.altair_chart(chart, use_container_width=True)
     else:
         st.bar_chart(chart_df.set_index("Scenario"))
-
 with right:
     st.subheader("Per-$1 View")
     chart_df2 = pd.DataFrame(

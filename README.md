@@ -6,11 +6,10 @@ A super-simple web app to compare Myanmar CBM split vs full black market rate fo
 ## Features
 - Inputs: USD amount, official %, r1 (official rate), r2 (black rate), optional fees
 - Outputs: Effective blended rate, MMK with split vs full black, shortfall, % realized
- - Charts: Altair bar charts comparing totals and per-$1 view
+- Charts: Altair bar charts comparing totals and per-$1 view
 - Sensitivity: quick grid of shortfall across p1% and r2 ±400
 - Scenarios: add multiple scenarios and export to CSV
-- Required-rate summary to show the black rate needed on the exporter's share
- - Required-rate summary to show the black rate needed on the exporter's share, accounting for % fees
+- Required-rate summary to show the black rate needed on the exporter's share, accounting for % fees
 
 ## Local Run
 ```bash
@@ -26,6 +25,7 @@ streamlit run app.py
 
 ## Notes
 - No external APIs used; rates are entered by you.
- - Flat fees apply equally to split and full-black paths; percentage fees apply only to the black-market portion in the split scenario.
+- Flat fees apply equally to split and full-black paths; percentage fees apply only to the black-market portion in the
+  split scenario.
 - You can customize branding and add authentication later if needed.
- - Charts fall back to Streamlit's built-ins if `altair` isn't installed.
+- Charts fall back to Streamlit's built-ins if `altair` isn't installed.
