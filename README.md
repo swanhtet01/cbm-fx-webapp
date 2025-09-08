@@ -10,6 +10,7 @@ A super-simple web app to compare Myanmar CBM split vs full black market rate fo
 - Sensitivity: quick grid of shortfall across p1% and r2 ±400
 - Scenarios: add multiple scenarios and export to CSV
 - Required-rate summary to show the black rate needed on the exporter's share
+ - Required-rate summary to show the black rate needed on the exporter's share, accounting for % fees
 
 ## Local Run
 ```bash

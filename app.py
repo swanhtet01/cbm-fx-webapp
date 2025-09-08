@@ -19,12 +19,16 @@ def blended_rate(p1_pct, r1, r2):
     return p1 * r1 + (1 - p1) * r2
 
 
-def required_rate(target_rate, p1_pct, r1):
-    """Rate on the non-official share to hit a target overall rate."""
+def required_rate(target_rate, p1_pct, r1, pct_fee=0.0):
+    """Rate on the non-official share to hit a target overall rate.
+
+    Accounts for percentage fees applied only to the non-official share.
+    """
     p1 = p1_pct / 100.0
-    if (1 - p1) == 0:
+    fee_factor = 1 - pct_fee
+    if (1 - p1) == 0 or fee_factor <= 0:
         return float("inf")
-    return (target_rate - p1 * r1) / (1 - p1)
+    return (target_rate - (p1 * r1) / fee_factor) / (1 - p1)
 
 def mmk_with_split(usd, p1_pct, r1, r2, flat_fee=0.0, pct_fee=0.0):
     rate = blended_rate(p1_pct, r1, r2)
@@ -78,11 +82,12 @@ rate_eff = blended_rate(p1_pct, r1, r2)
 mmk_split = mmk_with_split(usd, p1_pct, r1, r2, fee_flat, fee_pct)
 mmk_black = mmk_full_black(usd, r2, fee_flat, fee_pct)
 shortfall = mmk_black - mmk_split
-pct_of_black = (rate_eff / r2) if r2 else float("nan")
-pct_shortfall = 1 - pct_of_black if r2 else float("nan")
+pct_of_black = (mmk_split / mmk_black) if mmk_black else float("nan")
+pct_shortfall = 1 - pct_of_black if not math.isnan(pct_of_black) else float("nan")
 
 # Rate required on the remaining share to match full black payout
-r2_required = required_rate(r2, p1_pct, r1)
+r2_required = required_rate(r2, p1_pct, r1, fee_pct)
+r2_target = required_rate(r2 * (target_pct_black / 100.0), p1_pct, r1, fee_pct)
 cbm_usd = usd * (p1_pct / 100.0)
 exporter_usd = usd - cbm_usd
 target_total_mmk = usd * r2
@@ -90,8 +95,13 @@ cbm_mmk = cbm_usd * r1
 exporter_mmk_needed = exporter_usd * r2_required
 
 # Threshold analytics
+fee_factor = 1 - fee_pct
 p1_frac = p1_pct/100.0 if p1_pct is not None else 0.0
-p1_max_for_target = (r2 - (target_pct_black/100.0)*r2) / (r2 - r1) if (r2 - r1) != 0 else float("nan")
+p1_max_for_target = (
+    (r2 * fee_factor * (1 - target_pct_black/100.0)) / (r2 * fee_factor - r1)
+    if (r2 * fee_factor - r1) != 0
+    else float("nan")
+)
 
 # ====== TOP CARDS ======
 rate_delta = rate_eff - r2
@@ -99,7 +109,7 @@ mmk_delta = mmk_split - mmk_black
 delta_shortfall_str = (
     f"{pct_shortfall*100:,.2f}%" if not math.isnan(pct_shortfall) else "—"
 )
-per_100k_shortfall = 100000 * (r2 - rate_eff)
+per_100k_shortfall = (shortfall / usd * 100000) if usd else float("nan")
 
 k1, k2, k3, k4 = st.columns(4)
 k1.metric("Effective blended rate", fmt_rate(rate_eff), delta=fmt_rate(rate_delta))
@@ -107,7 +117,7 @@ k2.metric("MMK — With Split (net)", fmt_mmk(mmk_split), delta=fmt_mmk(mmk_delt
 k3.metric("MMK — Full Black (net)", fmt_mmk(mmk_black))
 k4.metric("Shortfall vs Full Black", fmt_mmk(shortfall), delta=delta_shortfall_str)
 
-k5, k6, k7 = st.columns(3)
+k5, k6, k7, k8 = st.columns(4)
 k5.metric(
     "% of Black Achieved",
     f"{pct_of_black*100:,.2f}%" if not math.isnan(pct_of_black) else "—",
@@ -116,7 +126,11 @@ k6.metric(
     "Required r₂ to match",
     fmt_rate(r2_required) if r2_required != float("inf") else "∞",
 )
-k7.metric("Per $100k Shortfall", fmt_mmk(per_100k_shortfall))
+k7.metric(
+    "Required r₂ for target",
+    fmt_rate(r2_target) if r2_target != float("inf") else "∞",
+)
+k8.metric("Per $100k Shortfall", fmt_mmk(per_100k_shortfall))
 
 st.markdown("---")
 

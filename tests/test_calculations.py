@@ -15,6 +15,11 @@ def test_required_rate():
     assert required_rate(3000, 100, 2100) == float("inf")
 
 
+def test_required_rate_with_fee():
+    val = required_rate(3000, 25, 2100, pct_fee=0.01)
+    assert math.isclose(val, (3000 * 0.99 - 0.25 * 2100) / (0.75 * 0.99))
+
+
 def test_fee_application():
     usd = 100
     p1 = 25
